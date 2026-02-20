@@ -5,21 +5,18 @@ const userSchema = new mongoose.Schema({
     nombre: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, default: "user" },
+    role: { type: String,enum: ["user", "admin"],
+         default: "user" },
     
     // ✅ NUEVOS CAMPOS para recuperación de contraseña
-    codigoRecuperacion: { 
-        type: String, 
-        required: false 
-    },
-    codigoExpiracion: { 
-        type: Number, 
-        required: false 
-    }
-}, {
-    timestamps: true // Opcional: agrega createdAt y updatedAt automáticamente
+    codigoRecuperacion: String, 
+    codigoExpiracion: Date, 
+        
 });
 
+//forzar que guarde en users
 const User = mongoose.model("User", userSchema, "User");
 
 export default User;
+
+///EL PROBLEMA FUTURO DE RECUPERACION PUEDE ESTAR AQUI

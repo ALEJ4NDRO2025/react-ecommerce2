@@ -1,22 +1,22 @@
 import express from "express";
-import { registrarProductos } from "../controllers/productoscontroles.js";
-import Productos from "../models/productos.js";
+import { verificarToken, soloAdmin } from "../middlewares/auth.middleware.js";
+import { registrarProductos, obtenerProductos, actualizarProducto, eliminarProducto } from "../controllers/productoscontroles.js";
 
 const router = express.Router();
 
-// Ruta para registrar un nuevo producto
-router.post("/", registrarProductos);
+// 👤 Ver productos (user y admin)
+router.get("/", verificarToken, obtenerProductos);
 
-// Ruta para obtener todos los productos
-router.get("/", async (req, res) => {
-    try {
-        // Usamos el modelo importado con mayúscula
-        const productos = await Productos.find();
-        res.json(productos);
-    } catch (error) {
-        console.error("Error al obtener los productos:", error);
-        res.status(500).json({ message: "Error al obtener los productos" });
-    }
-});
+// 👑 Crear
+router.post("/", verificarToken, soloAdmin, registrarProductos);
+
+// 👑 Actualizar
+router.put("/:id", verificarToken, soloAdmin, actualizarProducto);
+
+// 👑 Eliminar
+router.delete("/:id", verificarToken, soloAdmin, eliminarProducto);
 
 export default router;
+
+
+//PUEDE QUE HAYA ERORES ACA

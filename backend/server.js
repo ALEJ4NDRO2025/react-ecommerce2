@@ -7,6 +7,7 @@ import LoginRouter from './routes/Login.js';
 import obtenerPerfil from "./routes/perfil.js";
 import Recuperarpassword from "./routes/rc.js";
 import PedidosRouter from "./routes/pedidos.js";
+import adminRoutes from "./routes/admin.js";
 
 // Crear la aplicación de Express
 const app = express();
@@ -26,6 +27,7 @@ app.use("/api/login", LoginRouter); // <-- Usamos el router aquí
 app.use("/api/perfil", obtenerPerfil); // <-- Usamos el router aquí") ACUERDESE DE LOS .JS
 app.use('/api/Recuperar', Recuperarpassword)
 app.use("/api/pedidos", PedidosRouter);
+app.use("/api/admin", adminRoutes);
 
 // Escuchar al servidor al final
 app.listen(8081, () => console.log('Servidor corriendo en http://localhost:8081'));

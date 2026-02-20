@@ -18,6 +18,7 @@ export const registrarUsers = async (req, res) => {
         }
 
         // Encriptar la contraseña
+       
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Crear nuevo usuario

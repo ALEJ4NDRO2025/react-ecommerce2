@@ -33,48 +33,30 @@ export const obtenerProductos = async (req, res) => {
     }
 };
 
-// Actualizar un producto
+// actualizar un producto
 export const actualizarProducto = async (req, res) => {
     try {
-        // Obtenemos el ID del producto desde los parámetros de la URL
-        const { productId } = req.params;
-        // Obtenemos los nuevos datos desde el cuerpo de la petición
+        const { id } = req.params;
         const { nombre, descripcion, precio, imagen } = req.body;
 
-        // Buscamos por tu campo personalizado 'productId' y actualizamos
-        const productoActualizado = await Producto.findOneAndUpdate(
-            { productId: productId }, // Filtro: buscamos por tu ID personalizado
-            { nombre, descripcion, precio, imagen }, // Datos a actualizar
-            { new: true } // Opción: devuelve el dato ya actualizado
-        );
-
-        if (!productoActualizado) {
-            return res.status(404).json({ message: "Producto no encontrado" });
-        }
-
-        res.json({ message: "Producto actualizado con éxito", producto: productoActualizado });
+        await Producto.findByIdAndUpdate(id, { nombre, descripcion, precio, imagen });
+        res.json({ message: "Producto actualizado con éxito" });
     } catch (error) {
         console.error("Error al actualizar el producto:", error);
-        res.status(500).json({ message: "Error al actualizar el producto" });
+        res.status(400).json({ message: "Error al actualizar el producto" });
     }
 };
 
-// Eliminar un producto
+// eliminar un producto
 export const eliminarProducto = async (req, res) => {
     try {
-        // Obtenemos el ID del producto desde los parámetros de la URL
-        const { productId } = req.params;
+        const { id } = req.params;
 
-        // Buscamos por 'productId' y eliminamos
-        const productoEliminado = await Producto.findOneAndDelete({ productId: productId });
-
-        if (!productoEliminado) {
-            return res.status(404).json({ message: "Producto no encontrado" });
-        }
-
+        await Producto.findByIdAndDelete(id);
         res.json({ message: "Producto eliminado con éxito" });
     } catch (error) {
         console.error("Error al eliminar el producto:", error);
         res.status(500).json({ message: "Error al eliminar el producto" });
     }
 };
+
