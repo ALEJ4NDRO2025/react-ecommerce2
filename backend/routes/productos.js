@@ -4,6 +4,7 @@ import { registrarProductos, obtenerProductos, actualizarProducto, eliminarProdu
 
 const router = express.Router();
 
+
 // 👤 Ver productos (user y admin)
 router.get("/", verificarToken, obtenerProductos);
 

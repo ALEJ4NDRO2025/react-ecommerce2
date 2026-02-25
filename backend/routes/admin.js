@@ -4,6 +4,20 @@ import { registrarProductos, obtenerProductos, actualizarProducto, eliminarProdu
 
 const router = express.Router();
 
+
+// 👑 Dashboard admin ← AGREGAR ESTO
+router.get("/dashboard", verificarToken, soloAdmin, (req, res) => {
+    res.status(200).json({
+        message: "✅ Bienvenido al panel de administrador",
+        admin: {
+            nombre: req.usuario.nombre,
+            email: req.usuario.email,
+            rol: req.usuario.role
+        }
+    });
+});
+
+
 // 👤 Ver productos (user y admin)
 router.get("/", verificarToken, obtenerProductos);
 
