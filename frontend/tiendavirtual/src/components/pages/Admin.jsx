@@ -1,280 +1,313 @@
-import { useState, useEffect, useRef } from "react";
-import { useAuth } from "../context/AuthContext";
+// src/components/Pages/Admin.jsx
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
+import Layout from '../Layout/Layout';
 
-const API_URL = "http://localhost:8081/api/productos";
+export default function Admin() {
+  const { usuario } = useAuth();
 
-function ImageUploader({ value, onChange }) {
-    const [dragging, setDragging] = useState(false);
-    const inputRef = useRef();
+  // Estados de productos
+  const [productos, setProductos] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState('');
 
-    const processFile = (file) => {
-        if (!file) return;
-        if (!file.type.startsWith("image/")) { alert("Solo se permiten archivos de imagen."); return; }
-        if (file.size > 5 * 1024 * 1024) { alert("La imagen no puede superar los 5 MB."); return; }
-        const reader = new FileReader();
-        reader.onload = (e) => onChange(e.target.result);
-        reader.readAsDataURL(file);
-    };
+  // Formulario para crear/editar producto
+  const formVacio = { nombre: '', descripcion: '', precio: '', imagen: '' };
+  const [form, setForm]         = useState(formVacio);
+  const [editandoId, setEditandoId] = useState(null); // null = creando, id = editando
+  const [formLoading, setFormLoading] = useState(false);
+  const [formMsg, setFormMsg]   = useState({ type: '', text: '' });
+  const [showForm, setShowForm] = useState(false);
 
-    const handleFileInput = (e) => processFile(e.target.files[0]);
-    const handleDrop = (e) => { e.preventDefault(); setDragging(false); processFile(e.dataTransfer.files[0]); };
-    const handleDragOver = (e) => { e.preventDefault(); setDragging(true); };
-    const handleDragLeave = () => setDragging(false);
-    const handleRemove = () => { onChange(""); if (inputRef.current) inputRef.current.value = ""; };
+  const headers = { Authorization: `Bearer ${usuario.token}` };
 
-    return (
-        <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Imagen del Producto *</label>
-            {value ? (
-                <div className="relative w-full h-44 rounded-xl overflow-hidden border-2 border-purple-200 bg-gray-50 group">
-                    <img src={value} alt="preview" className="w-full h-full object-contain" />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-                        <button type="button" onClick={() => inputRef.current?.click()} className="px-4 py-2 bg-white text-gray-800 rounded-lg text-xs font-semibold">Cambiar imagen</button>
-                        <button type="button" onClick={handleRemove} className="px-4 py-2 bg-red-500 text-white rounded-lg text-xs font-semibold">Quitar imagen</button>
-                    </div>
-                </div>
-            ) : (
-                <div
-                    onClick={() => inputRef.current?.click()}
-                    onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
-                    className={`w-full h-44 rounded-xl border-2 border-dashed cursor-pointer flex flex-col items-center justify-center gap-3 transition-all duration-200 ${dragging ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-gray-50 hover:border-purple-400"}`}
-                >
-                    <p className={`text-sm font-semibold ${dragging ? "text-purple-600" : "text-gray-500"}`}>
-                        {dragging ? "¡Suelta la imagen aquí!" : "Arrastra una imagen o haz clic"}
-                    </p>
-                    <p className="text-xs text-gray-400">PNG, JPG, WEBP — máximo 5 MB</p>
-                </div>
-            )}
-            <input ref={inputRef} type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
+  // Cargar productos
+  const cargarProductos = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await axios.get('http://localhost:8081/api/productos', { headers });
+      setProductos(res.data);
+    } catch (err) {
+      setError('Error al cargar los productos. Verifica la conexión con el servidor.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { cargarProductos(); }, []);
+
+  // Manejar cambios en el formulario
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  // Abrir formulario para crear
+  const abrirCrear = () => {
+    setForm(formVacio);
+    setEditandoId(null);
+    setFormMsg({ type: '', text: '' });
+    setShowForm(true);
+  };
+
+  // Abrir formulario para editar
+  const abrirEditar = (p) => {
+    setForm({ nombre: p.nombre, descripcion: p.descripcion, precio: p.precio, imagen: p.imagen || '' });
+    setEditandoId(p._id);
+    setFormMsg({ type: '', text: '' });
+    setShowForm(true);
+  };
+
+  // Crear o actualizar producto
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setFormLoading(true);
+    setFormMsg({ type: '', text: '' });
+
+    try {
+      if (editandoId) {
+        // PUT /api/productos/:id — requiere token + soloAdmin
+        await axios.put(`http://localhost:8081/api/productos/${editandoId}`, form, { headers });
+        setFormMsg({ type: 'success', text: 'Producto actualizado con éxito ✅' });
+      } else {
+        // POST /api/productos — requiere token + soloAdmin
+        // El backend espera: { productId, nombre, descripcion, precio, imagen }
+        const productId = `PROD-${Date.now()}`;
+        await axios.post('http://localhost:8081/api/productos', { productId, ...form, precio: Number(form.precio) }, { headers });
+        setFormMsg({ type: 'success', text: 'Producto creado con éxito ✅' });
+      }
+      await cargarProductos();
+      setTimeout(() => { setShowForm(false); setForm(formVacio); setEditandoId(null); setFormMsg({ type: '', text: '' }); }, 1500);
+    } catch (err) {
+      setFormMsg({ type: 'error', text: err.response?.data?.message || 'Error al guardar el producto' });
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // Eliminar producto
+  const eliminarProducto = async (id, nombre) => {
+    if (!confirm(`¿Seguro que deseas eliminar "${nombre}"?`)) return;
+    try {
+      await axios.delete(`http://localhost:8081/api/productos/${id}`, { headers });
+      await cargarProductos();
+    } catch (err) {
+      alert('Error al eliminar el producto');
+    }
+  };
+
+  const formatearPrecio = (precio) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(precio);
+
+  return (
+    <Layout>
+      <div className="container mx-auto px-4 py-8">
+
+        {/* Encabezado del panel */}
+        <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-2xl p-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-yellow-400 text-xl">👑</span>
+              <h1 className="text-2xl font-bold">Panel Administrativo</h1>
+            </div>
+            <p className="text-gray-300 text-sm">
+              Bienvenido, <span className="text-orange-400 font-semibold">{usuario.nombre}</span> — Gestiona los productos de la tienda
+            </p>
+          </div>
+          <button
+            onClick={abrirCrear}
+            className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-all duration-200"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Nuevo producto
+          </button>
         </div>
-    );
-}
 
-export default function AdminPanel() {
-    const { usuario, logout } = useAuth();
-    const [productos, setProductos] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState("productos");
-    const [editando, setEditando] = useState(null);
-    const [mensaje, setMensaje] = useState({ tipo: "", texto: "" });
-    const formInicial = { productId: "", nombre: "", descripcion: "", precio: "", imagen: "" };
-    const [form, setForm] = useState(formInicial);
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4 border border-gray-100">
+            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{productos.length}</p>
+              <p className="text-gray-500 text-sm">Total productos</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4 border border-gray-100">
+            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{productos.length}</p>
+              <p className="text-gray-500 text-sm">Productos activos</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4 border border-gray-100">
+            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+              <span className="text-xl">👑</span>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-gray-900">{usuario.role?.toUpperCase()}</p>
+              <p className="text-gray-500 text-sm">Tu rol</p>
+            </div>
+          </div>
+        </div>
 
-    const headers = {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${usuario?.token}`,
-    };
+        {/* Modal / Formulario */}
+        {showForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+              <div className="flex justify-between items-center mb-5">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {editandoId ? 'Editar producto' : 'Nuevo producto'}
+                </h2>
+                <button
+                  onClick={() => { setShowForm(false); setForm(formVacio); setEditandoId(null); }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => { fetchProductos(); }, []);
-
-    const fetchProductos = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch(API_URL, { headers });
-            const data = await res.json();
-            setProductos(data);
-        } catch { mostrarMensaje("error", "Error al cargar productos"); }
-        finally { setLoading(false); }
-    };
-
-    const mostrarMensaje = (tipo, texto) => {
-        setMensaje({ tipo, texto });
-        setTimeout(() => setMensaje({ tipo: "", texto: "" }), 3000);
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!form.imagen) { mostrarMensaje("error", "Debes seleccionar una imagen"); return; }
-        try {
-            const url = editando ? `${API_URL}/${editando._id}` : API_URL;
-            const method = editando ? "PUT" : "POST";
-            const res = await fetch(url, {
-                method, headers,
-                body: JSON.stringify({ ...form, precio: parseFloat(form.precio) }),
-            });
-            if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
-            mostrarMensaje("success", editando ? "Producto actualizado" : "Producto creado");
-            setForm(formInicial); setEditando(null); setActiveTab("productos");
-            fetchProductos();
-        } catch (err) { mostrarMensaje("error", err.message || "Error al guardar producto"); }
-    };
-
-    const handleEliminar = async (id) => {
-        if (!confirm("¿Eliminar este producto?")) return;
-        try {
-            const res = await fetch(`${API_URL}/${id}`, { method: "DELETE", headers });
-            if (!res.ok) throw new Error();
-            mostrarMensaje("success", "Producto eliminado");
-            fetchProductos();
-        } catch { mostrarMensaje("error", "Error al eliminar producto"); }
-    };
-
-    const handleEditar = (prod) => {
-        setEditando(prod);
-        setForm({
-            productId: prod.productId || "",
-            nombre: prod.nombre || "",
-            descripcion: prod.descripcion || "",
-            precio: prod.precio?.toString() || "",
-            imagen: prod.imagen || "",
-        });
-        setActiveTab("agregar");
-    };
-
-    const cancelarEdicion = () => {
-        setEditando(null); setForm(formInicial); setActiveTab("productos");
-    };
-
-    return (
-        <div className="min-h-screen bg-linear-to-br from-purple-50 via-blue-50 to-pink-50">
-            {/* Header */}
-            <header className="bg-white shadow-md">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <h1 className="text-xl font-bold text-gray-800">Panel Administrativo</h1>
-                    <div className="flex items-center gap-4">
-                        <div className="text-right hidden sm:block">
-                            <p className="font-semibold text-gray-800">{usuario?.nombre}</p>
-                            <p className="text-xs text-purple-500 font-medium">Administrador</p>
-                        </div>
-                        <button onClick={logout} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                            Salir
-                        </button>
-                    </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del producto</label>
+                  <input type="text" name="nombre" value={form.nombre} onChange={handleChange} required placeholder="Ej: Laptop Dell XPS 15"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
                 </div>
-            </header>
-
-            <main className="max-w-7xl mx-auto px-6 py-8">
-                {/* Estadísticas */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div className="bg-linear-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white">
-                        <span className="text-4xl font-bold">{productos.length}</span>
-                        <p className="font-semibold mt-3">Productos</p>
-                        <p className="text-blue-100 text-xs mt-1">En catálogo</p>
-                    </div>
-                    <div className="bg-linear-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white">
-                        <span className="text-4xl font-bold">–</span>
-                        <p className="font-semibold mt-3">Pedidos hoy</p>
-                    </div>
-                    <div className="bg-linear-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white">
-                        <span className="text-4xl font-bold">–</span>
-                        <p className="font-semibold mt-3">Usuarios</p>
-                    </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <textarea name="descripcion" value={form.descripcion} onChange={handleChange} required rows={3} placeholder="Descripción del producto..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio (COP)</label>
+                  <input type="number" name="precio" value={form.precio} onChange={handleChange} required min="0" placeholder="Ej: 3500000"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">URL de imagen</label>
+                  <input type="url" name="imagen" value={form.imagen} onChange={handleChange} required placeholder="https://..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
                 </div>
 
-                {/* Mensaje feedback */}
-                {mensaje.texto && (
-                    <div className={`mb-6 px-5 py-3 rounded-xl text-sm font-medium ${mensaje.tipo === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
-                        {mensaje.tipo === "success" ? "✅" : "❌"} {mensaje.texto}
-                    </div>
+                {formMsg.text && (
+                  <div className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm ${
+                    formMsg.type === 'error' ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-green-50 border border-green-200 text-green-800'
+                  }`}>
+                    <span>{formMsg.text}</span>
+                  </div>
                 )}
 
-                {/* Tabs */}
-                <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-                    <div className="flex border-b border-gray-100">
-                        <button onClick={() => { setActiveTab("productos"); cancelarEdicion(); }}
-                            className={`flex-1 py-4 text-sm font-semibold transition-colors ${activeTab === "productos" ? "text-purple-600 border-b-2 border-purple-600 bg-purple-50" : "text-gray-500 hover:text-gray-700"}`}>
-                            Productos ({productos.length})
-                        </button>
-                        <button onClick={() => { setActiveTab("agregar"); if (!editando) setForm(formInicial); }}
-                            className={`flex-1 py-4 text-sm font-semibold transition-colors ${activeTab === "agregar" ? "text-purple-600 border-b-2 border-purple-600 bg-purple-50" : "text-gray-500 hover:text-gray-700"}`}>
-                            {editando ? "✏ Editar Producto" : "➕ Agregar Producto"}
-                        </button>
-                    </div>
-
-                    {/* Tab productos */}
-                    {activeTab === "productos" && (
-                        <div className="p-6">
-                            {loading ? (
-                                <div className="space-y-3">
-                                    {[...Array(4)].map((_, i) => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}
-                                </div>
-                            ) : productos.length === 0 ? (
-                                <div className="text-center py-16 text-gray-400">
-                                    <p className="font-semibold">No hay productos aún</p>
-                                    <button onClick={() => setActiveTab("agregar")} className="mt-4 text-purple-600 font-medium hover:underline">Agregar el primer producto →</button>
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="text-left text-gray-400 text-xs uppercase border-b border-gray-100">
-                                                <th className="pb-3 pl-2">Producto</th>
-                                                <th className="pb-3">Descripción</th>
-                                                <th className="pb-3">Precio</th>
-                                                <th className="pb-3 text-right pr-2">Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {productos.map((prod) => (
-                                                <tr key={prod._id} className="hover:bg-gray-50 transition-colors">
-                                                    <td className="py-3.5 pl-2">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100">
-                                                                {prod.imagen ? <img src={prod.imagen} alt={prod.nombre} className="w-full h-full object-cover" /> : <span>📦</span>}
-                                                            </div>
-                                                            <div>
-                                                                <p className="font-semibold text-gray-800">{prod.nombre}</p>
-                                                                <p className="text-xs text-gray-400">ID: {prod.productId}</p>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-3.5 text-gray-500 max-w-xs"><p className="truncate">{prod.descripcion}</p></td>
-                                                    <td className="py-3.5 font-bold text-gray-800">${parseFloat(prod.precio).toFixed(2)}</td>
-                                                    <td className="py-3.5 pr-2">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <button onClick={() => handleEditar(prod)} className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-semibold">Editar</button>
-                                                            <button onClick={() => handleEliminar(prod._id)} className="px-3 py-1.5 bg-red-50 text-red-500 hover:bg-red-100 rounded-lg text-xs font-semibold">Eliminar</button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Tab agregar/editar */}
-                    {activeTab === "agregar" && (
-                        <div className="p-6 max-w-xl">
-                            <h3 className="font-bold text-gray-800 text-lg mb-6">
-                                {editando ? `Editando: ${editando.nombre}` : "Nuevo Producto"}
-                            </h3>
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1.5">ID del Producto *</label>
-                                        <input type="text" value={form.productId} required onChange={e => setForm({ ...form, productId: e.target.value })} placeholder="ej: PROD-001" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-purple-500" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Precio *</label>
-                                        <input type="number" min="0" step="0.01" value={form.precio} required onChange={e => setForm({ ...form, precio: e.target.value })} placeholder="0.00" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-purple-500" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Nombre *</label>
-                                    <input type="text" value={form.nombre} required onChange={e => setForm({ ...form, nombre: e.target.value })} placeholder="Nombre del producto" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-purple-500" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Descripción *</label>
-                                    <textarea value={form.descripcion} required rows={3} onChange={e => setForm({ ...form, descripcion: e.target.value })} placeholder="Descripción del producto" className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-purple-500 resize-none" />
-                                </div>
-                                <ImageUploader value={form.imagen} onChange={(base64) => setForm({ ...form, imagen: base64 })} />
-                                <div className="flex gap-3 pt-2">
-                                    <button type="submit" className="flex-1 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-3 rounded-xl font-semibold text-sm">
-                                        {editando ? "💾 Guardar Cambios" : "➕ Crear Producto"}
-                                    </button>
-                                    {editando && (
-                                        <button type="button" onClick={cancelarEdicion} className="px-6 py-3 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl font-semibold text-sm">Cancelar</button>
-                                    )}
-                                </div>
-                            </form>
-                        </div>
-                    )}
+                <div className="flex gap-3 pt-2">
+                  <button type="submit" disabled={formLoading}
+                    className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-60 text-sm">
+                    {formLoading ? 'Guardando...' : (editandoId ? 'Actualizar' : 'Crear producto')}
+                  </button>
+                  <button type="button" onClick={() => setShowForm(false)}
+                    className="px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
+                    Cancelar
+                  </button>
                 </div>
-            </main>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Tabla de productos */}
+        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Lista de Productos</h2>
+            <span className="text-sm text-gray-500">{productos.length} productos</span>
+          </div>
+
+          {loading && (
+            <div className="flex justify-center items-center py-16">
+              <svg className="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+            </div>
+          )}
+
+          {error && (
+            <div className="m-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">{error}</div>
+          )}
+
+          {!loading && !error && productos.length === 0 && (
+            <div className="text-center py-16 text-gray-500">
+              <p className="text-lg font-medium mb-1">No hay productos</p>
+              <p className="text-sm">Crea el primero con el botón "Nuevo producto"</p>
+            </div>
+          )}
+
+          {!loading && !error && productos.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-600 uppercase text-xs tracking-wider">
+                  <tr>
+                    <th className="px-6 py-3 text-left">Imagen</th>
+                    <th className="px-6 py-3 text-left">Producto</th>
+                    <th className="px-6 py-3 text-left">ID</th>
+                    <th className="px-6 py-3 text-left">Precio</th>
+                    <th className="px-6 py-3 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {productos.map((p) => (
+                    <tr key={p._id} className="hover:bg-gray-50 transition-colors duration-150">
+                      <td className="px-6 py-4">
+                        <img
+                          src={p.imagen}
+                          alt={p.nombre}
+                          className="w-14 h-14 object-cover rounded-lg border border-gray-200"
+                          onError={(e) => { e.target.src = 'https://via.placeholder.com/56?text=N/A'; }}
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-gray-900 line-clamp-1">{p.nombre}</p>
+                        <p className="text-gray-400 text-xs mt-0.5 line-clamp-2">{p.descripcion}</p>
+                      </td>
+                      <td className="px-6 py-4 text-gray-500 font-mono text-xs">{p.productId}</td>
+                      <td className="px-6 py-4 font-semibold text-blue-600">{formatearPrecio(p.precio)}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => abrirEditar(p)}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors text-xs font-medium"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => eliminarProducto(p._id, p.nombre)}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors text-xs font-medium"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-    );
+      </div>
+    </Layout>
+  );
 }
