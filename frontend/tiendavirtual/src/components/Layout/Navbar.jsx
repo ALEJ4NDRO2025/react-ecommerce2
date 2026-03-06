@@ -1,126 +1,145 @@
-// src/components/Layout/Navbar.jsx
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useState, useRef, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
-const Navbar = () => {
+function CartIcon() {
+  const carrito = JSON.parse(localStorage.getItem("carrito") || "[]");
+  const total = carrito.reduce((s, i) => s + i.cantidad, 0);
+  return (
+    <Link to="/carrito" className="relative group p-2.5 hover:bg-gray-700 rounded-xl transition-all duration-300 transform hover:scale-105">
+      <svg className="w-6 h-6 text-gray-400 group-hover:text-blue-400 transition-all duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.1 5M7 13l-1.1 5m0 0h1.1m0-5v5m0 0h10m-10 0a2 2 0 104 0m6 0a2 2 0 100 4"/>
+      </svg>
+      {total > 0 && (
+        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-5 h-5 flex items-center justify-center px-1 shadow-lg border-2 border-white">
+          {total}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+export default function Navbar() {
   const { usuario, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const navigate = useNavigate();
+  const [dropOpen, setDropOpen] = useState(false);
+  const dropRef = useRef(null);
+
+  useEffect(() => {
+    function handler(e) {
+      if (dropRef.current && !dropRef.current.contains(e.target)) setDropOpen(false);
+    }
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
+
+  const iniciales = usuario?.nombre
+    ? usuario.nombre.trim().split(" ").slice(0, 2).map(p => p[0].toUpperCase()).join("")
+    : "?";
+
+  const isAdmin = usuario?.role === "admin";
 
   return (
     <header className="bg-gray-900 text-white shadow-lg sticky top-0 z-50">
       <nav className="container mx-auto px-4 py-4">
         <div className="flex justify-between items-center">
-
           {/* Logo */}
-          <div className="flex items-center">
+          <Link to="/" className="flex items-center">
             <div className="bg-gradient-to-r from-red-600 to-orange-600 text-white px-3 py-2 rounded-lg mr-3">
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
               </svg>
             </div>
-            <h1 className="text-2xl font-extrabold">
-              <Link to="/">
-                <span className="text-red-500">Tienda</span>{' '}
-                <span className="text-orange-500">AXT</span>
-              </Link>
-            </h1>
-          </div>
+            <span className="text-2xl font-extrabold bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
+              Tienda AXT
+            </span>
+          </Link>
 
-          {/* Links de navegación escritorio */}
+          {/* Links desktop */}
           <div className="hidden md:flex items-center space-x-8">
             <div className="flex space-x-6">
-              <Link to="/" className="text-white hover:text-orange-500 font-light transition-colors duration-200 relative group">
-                Inicio
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 transition-all duration-200 group-hover:w-full"></span>
-              </Link>
-              {usuario && (
-                <Link to="/productos" className="text-white hover:text-orange-500 font-light transition-colors duration-200 relative group">
-                  Productos
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 transition-all duration-200 group-hover:w-full"></span>
-                </Link>
+              {!isAdmin && (
+                <>
+                  <NavLink to="/">Inicio</NavLink>
+                  <NavLink to="/productos">Productos</NavLink>
+                  <NavLink to="/pedidos">Mis Pedidos</NavLink>
+                  <NavLink to="/contact">Contacto</NavLink>
+                </>
               )}
-              {usuario?.role === 'admin' && (
-                <Link to="/admin" className="text-white hover:text-orange-500 font-light transition-colors duration-200 relative group">
-                  Panel Admin
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 transition-all duration-200 group-hover:w-full"></span>
-                </Link>
-              )}
+              {isAdmin && <NavLink to="/admin">Panel Admin</NavLink>}
             </div>
 
-            {/* Botones de sesión */}
             <div className="flex items-center space-x-3">
-              {usuario ? (
-                <div className="flex items-center space-x-3">
-                  {/* Avatar del usuario */}
-                  <div className="flex items-center space-x-2 bg-gray-800 rounded-xl px-3 py-2">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-                      {usuario.nombre?.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="text-sm">
-                      <p className="text-white font-medium leading-none">{usuario.nombre}</p>
-                      <p className="text-gray-400 text-xs">{usuario.role === 'admin' ? '👑 Admin' : '👤 Usuario'}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={logout}
-                    className="bg-red-600 hover:bg-red-700 text-white text-sm px-4 py-2 rounded-lg transition-colors duration-200"
-                  >
-                    Salir
-                  </button>
-                </div>
+              {!isAdmin && <CartIcon />}
+
+              {!usuario ? (
+                <Link to="/login" className="relative group p-2.5 hover:bg-gray-700 rounded-xl transition-all duration-300 transform hover:scale-105">
+                  <svg className="w-6 h-6 text-gray-400 group-hover:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                  </svg>
+                </Link>
               ) : (
-                <div className="flex items-center space-x-2">
-                  <Link
-                    to="/login"
-                    className="text-gray-300 hover:text-white text-sm px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors duration-200"
+                <div className="relative" ref={dropRef}>
+                  <button
+                    onClick={() => setDropOpen(!dropOpen)}
+                    className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold shadow-md hover:scale-105 transition-transform"
                   >
-                    Iniciar sesión
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-sm px-4 py-2 rounded-lg transition-all duration-200"
-                  >
-                    Registrarse
-                  </Link>
+                    {iniciales}
+                  </button>
+                  {dropOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 z-50">
+                      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                        <p className="text-sm font-bold text-gray-900 truncate">{usuario.nombre}</p>
+                        <p className="text-xs text-gray-500 truncate">{usuario.email}</p>
+                        <p className="text-xs text-blue-600 font-semibold mt-1 uppercase">{usuario.role}</p>
+                      </div>
+                      {!isAdmin && (
+                        <Link to="/profile" className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                          Mi Perfil
+                        </Link>
+                      )}
+                      <button onClick={logout} className="flex items-center w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium border-t border-gray-100">
+                        <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                        Cerrar sesión
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Botón menú móvil */}
-          <button
-            className="md:hidden text-white hover:text-orange-500"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
+          {/* Hamburger */}
+          <button className="md:hidden text-white" onClick={() => setMenuOpen(!menuOpen)}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-              {menuOpen
-                ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7" />
-              }
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7"/>
             </svg>
           </button>
         </div>
 
-        {/* Menú móvil desplegable */}
+        {/* Mobile menu */}
         {menuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-gray-700 pt-4 space-y-3">
-            <Link to="/" className="block text-white hover:text-orange-500 py-1" onClick={() => setMenuOpen(false)}>Inicio</Link>
-            {usuario && (
-              <Link to="/productos" className="block text-white hover:text-orange-500 py-1" onClick={() => setMenuOpen(false)}>Productos</Link>
+          <div className="md:hidden mt-4 pb-2 border-t border-gray-700 pt-4 space-y-2">
+            {!isAdmin && (
+              <>
+                <MobileLink to="/" onClick={() => setMenuOpen(false)}>Inicio</MobileLink>
+                <MobileLink to="/productos" onClick={() => setMenuOpen(false)}>Productos</MobileLink>
+                <MobileLink to="/pedidos" onClick={() => setMenuOpen(false)}>Mis Pedidos</MobileLink>
+                <MobileLink to="/contact" onClick={() => setMenuOpen(false)}>Contacto</MobileLink>
+                <MobileLink to="/carrito" onClick={() => setMenuOpen(false)}>Carrito</MobileLink>
+              </>
             )}
-            {usuario?.role === 'admin' && (
-              <Link to="/admin" className="block text-white hover:text-orange-500 py-1" onClick={() => setMenuOpen(false)}>Panel Admin</Link>
-            )}
+            {isAdmin && <MobileLink to="/admin" onClick={() => setMenuOpen(false)}>Panel Admin</MobileLink>}
             {usuario ? (
-              <button onClick={() => { logout(); setMenuOpen(false); }} className="block text-red-400 hover:text-red-300 py-1">
-                Cerrar sesión
-              </button>
+              <>
+                {!isAdmin && <MobileLink to="/profile" onClick={() => setMenuOpen(false)}>Mi Perfil</MobileLink>}
+                <button onClick={logout} className="block w-full text-left px-3 py-2 text-red-400 hover:text-red-300">Cerrar sesión</button>
+              </>
             ) : (
               <>
-                <Link to="/login" className="block text-white hover:text-orange-500 py-1" onClick={() => setMenuOpen(false)}>Iniciar sesión</Link>
-                <Link to="/register" className="block text-white hover:text-orange-500 py-1" onClick={() => setMenuOpen(false)}>Registrarse</Link>
+                <MobileLink to="/login" onClick={() => setMenuOpen(false)}>Iniciar sesión</MobileLink>
+                <MobileLink to="/register" onClick={() => setMenuOpen(false)}>Registrarse</MobileLink>
               </>
             )}
           </div>
@@ -128,6 +147,21 @@ const Navbar = () => {
       </nav>
     </header>
   );
-};
+}
 
-export default Navbar;
+function NavLink({ to, children }) {
+  return (
+    <Link to={to} className="text-white hover:text-orange-400 font-extralight transition-colors duration-200 relative group">
+      {children}
+      <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 transition-all duration-200 group-hover:w-full"></span>
+    </Link>
+  );
+}
+
+function MobileLink({ to, onClick, children }) {
+  return (
+    <Link to={to} onClick={onClick} className="block px-3 py-2 text-white hover:text-orange-400 transition-colors">
+      {children}
+    </Link>
+  );
+}

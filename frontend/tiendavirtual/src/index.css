@@ -2,11 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+/* Animación spinner para lucide Loader2 */
+@layer utilities {
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
 }

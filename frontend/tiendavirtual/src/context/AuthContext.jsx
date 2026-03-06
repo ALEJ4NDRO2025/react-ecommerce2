@@ -1,68 +1,61 @@
-// src/context/AuthContext.jsx
-import { createContext, useContext, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { createContext, useContext, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const AuthContext = createContext();
+export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider = ({ children }) => {
+export const BASE_URL = "http://localhost:8081";
+
+// ✅ Instancia de axios que agrega el token automáticamente
+export const authAxios = axios.create();
+authAxios.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
   const navigate = useNavigate();
 
-  // LOGIN — conecta con POST /api/login del backend de Alejandro
-  // El backend espera: { email, password }
-  // El backend responde: { message, token, user: { userId, nombre, email, role } }
-  const login = async (email, password) => {
-    try {
-      const response = await axios.post('http://localhost:8081/api/login', {
-        email,
-        password,
-      });
-
-      const data = response.data;
-
-      // Guardamos usuario + token en memoria (Context)
-      setUsuario({
-        ...data.user,
-        token: data.token,
-      });
-
-      // Redirigir según el rol
-      if (data.user.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/productos');
-      }
-    } catch (error) {
-      // Propagamos el error al componente Login para mostrarlo
-      if (error.response) {
-        throw new Error(error.response.data.message || 'Error al iniciar sesión');
-      } else if (error.request) {
-        throw new Error('No se pudo conectar con el servidor');
-      } else {
-        throw new Error('Error al procesar la solicitud');
-      }
+  useEffect(() => {
+    const sesion = localStorage.getItem("SesionActiva");
+    const datos = localStorage.getItem("usuario");
+    if (sesion && datos) {
+      setUsuario(JSON.parse(datos));
     }
+  }, []);
+
+  const login = async (email, password) => {
+    const res = await axios.post(`${BASE_URL}/api/login`, { email, password });
+    const u = res.data.user;
+    const token = res.data.token; // ✅ Guardar el token JWT
+    localStorage.setItem("SesionActiva", "true");
+    localStorage.setItem("usuario", JSON.stringify(u));
+    localStorage.setItem("token", token);
+    setUsuario(u);
+    if (u.role === "admin") navigate("/admin");
+    else navigate("/productos");
   };
 
-  // LOGOUT
+  const register = async ({ nombre, email, password }) => {
+    const userId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : `u-${Date.now()}`;
+    await axios.post(`${BASE_URL}/api/users`, { userId, nombre, email, password });
+  };
+
   const logout = () => {
+    localStorage.removeItem("SesionActiva");
+    localStorage.removeItem("usuario");
+    localStorage.removeItem("carrito");
+    localStorage.removeItem("token"); // ✅ Limpiar token
     setUsuario(null);
-    navigate('/login');
+    navigate("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ usuario, login, logout }}>
+    <AuthContext.Provider value={{ usuario, login, logout, register, BASE_URL }}>
       {children}
     </AuthContext.Provider>
   );
-};
-
-// Hook personalizado para usar el contexto
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth debe usarse dentro de un AuthProvider');
-  }
-  return context;
-};
+}
